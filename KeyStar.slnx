@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/KeyStar.Core/KeyStar.Core.csproj" />
+  <Project Path="src/KeyStar.Storage/KeyStar.Storage.csproj" />
+  <Project Path="src/KeyStar.App/KeyStar.App.csproj" />
+  <Project Path="tests/KeyStar.Core.Tests/KeyStar.Core.Tests.csproj" />
+</Solution>
