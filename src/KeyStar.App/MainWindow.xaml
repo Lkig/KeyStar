@@ -127,71 +127,100 @@
                                    Margin="16,0,16,0"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"
-                                   Text="选择要统计的时间范围；预设范围会随时间自动刷新，自定义范围选定后保持不变。" />
+                                   Text="「全部」与「今天」会随统计自动刷新；选择「自定义」后用日历指定起止日期与时间，再点击「应用范围」。" />
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="色阶" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ComboBox x:Name="ScaleModeComboBox"
-                                      Width="104"
-                                      VerticalAlignment="Center"
-                                      SelectionChanged="ScaleModeComboBox_SelectionChanged">
-                                <ComboBoxItem Content="平方根" Tag="SquareRoot" IsSelected="True" />
-                                <ComboBoxItem Content="线性" Tag="Linear" />
-                            </ComboBox>
+                            <RadioButton x:Name="ScaleModeSquareRootRadio"
+                                         Content="平方根"
+                                         GroupName="ScaleMode"
+                                         IsChecked="True"
+                                         Style="{StaticResource RangeChipStyle}"
+                                         Checked="ScaleModeRadio_Checked" />
+                            <RadioButton x:Name="ScaleModeLinearRadio"
+                                         Content="线性"
+                                         GroupName="ScaleMode"
+                                         Style="{StaticResource RangeChipStyle}"
+                                         Checked="ScaleModeRadio_Checked" />
                         </StackPanel>
                     </Grid>
 
-                    <!-- 控件行 -->
-                    <WrapPanel Grid.Row="1" Margin="0,14,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="范围" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <ComboBox x:Name="RangePresetComboBox"
-                                  Width="132"
-                                  Margin="0,0,14,0"
-                                  VerticalAlignment="Center"
-                                  SelectionChanged="RangePresetComboBox_SelectionChanged">
-                            <ComboBoxItem Content="今天" Tag="Today" IsSelected="True" />
-                            <ComboBoxItem Content="最近 10 分钟" Tag="Recent10" />
-                            <ComboBoxItem Content="最近 7 天" Tag="Recent7Days" />
-                            <ComboBoxItem Content="最近 30 天" Tag="Recent30Days" />
-                            <ComboBoxItem Content="全部历史" Tag="All" />
-                            <ComboBoxItem Content="自定义范围" Tag="Custom" />
-                        </ComboBox>
+                    <!-- 范围选项 + 自定义区间 -->
+                    <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="范围" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="RangeAllRadio"
+                                         Content="全部"
+                                         Tag="All"
+                                         GroupName="RangePreset"
+                                         IsChecked="True"
+                                         Style="{StaticResource RangeChipStyle}"
+                                         Checked="RangePresetRadio_Checked" />
+                            <RadioButton x:Name="RangeTodayRadio"
+                                         Content="今天"
+                                         Tag="Today"
+                                         GroupName="RangePreset"
+                                         Style="{StaticResource RangeChipStyle}"
+                                         Checked="RangePresetRadio_Checked" />
+                            <RadioButton x:Name="RangeCustomRadio"
+                                         Content="自定义"
+                                         Tag="Custom"
+                                         GroupName="RangePreset"
+                                         Style="{StaticResource RangeChipStyle}"
+                                         Checked="RangePresetRadio_Checked" />
+                        </StackPanel>
 
-                        <TextBlock Text="从" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <DatePicker x:Name="StartDatePicker" Width="132" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="StartTimeComboBox"
-                                  Width="80"
-                                  Margin="0,0,10,0"
-                                  IsEditable="True"
-                                  IsTextSearchEnabled="False"
-                                  VerticalContentAlignment="Center"
-                                  VerticalAlignment="Center" />
-                        <TextBlock Text="→" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <DatePicker x:Name="EndDatePicker" Width="132" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="EndTimeComboBox"
-                                  Width="80"
-                                  Margin="0,0,14,0"
-                                  IsEditable="True"
-                                  IsTextSearchEnabled="False"
-                                  VerticalContentAlignment="Center"
-                                  VerticalAlignment="Center" />
+                        <Border x:Name="CustomRangePanel"
+                                Margin="0,12,0,0"
+                                Padding="14,12"
+                                Visibility="Collapsed"
+                                Background="{StaticResource PanelDeepBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="3">
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="从" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <DatePicker x:Name="StartDatePicker"
+                                            Width="136"
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip="点击右侧日历图标选择开始日期" />
+                                <TextBox x:Name="StartTimeTextBox"
+                                         Width="72"
+                                         Margin="0,0,18,0"
+                                         Text="00:00"
+                                         TextAlignment="Center"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         VerticalContentAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         ToolTip="开始时间，格式 HH:mm" />
+                                <TextBlock Text="→" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                                <DatePicker x:Name="EndDatePicker"
+                                            Width="136"
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip="点击右侧日历图标选择结束日期" />
+                                <TextBox x:Name="EndTimeTextBox"
+                                         Width="72"
+                                         Margin="0,0,18,0"
+                                         TextAlignment="Center"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         VerticalContentAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         ToolTip="结束时间，格式 HH:mm（不含该时刻）" />
+                                <Button x:Name="ApplyRangeButton"
+                                        Content="应用范围"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        VerticalAlignment="Center"
+                                        Click="ApplyRangeButton_Click" />
+                            </WrapPanel>
+                        </Border>
 
-                        <CheckBox x:Name="TenMinuteSnapCheckBox"
-                                  Content="10 分钟吸附"
-                                  Focusable="False"
-                                  IsChecked="True"
-                                  Margin="0,0,14,0"
-                                  VerticalAlignment="Center" />
-                        <Button x:Name="ApplyRangeButton"
-                                Content="应用范围"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Margin="0,0,12,0"
-                                VerticalAlignment="Center"
-                                Click="ApplyRangeButton_Click" />
                         <TextBlock x:Name="RangeValidationText"
                                    Foreground="{StaticResource AmberBrush}"
+                                   Margin="0,8,0,0"
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap" />
-                    </WrapPanel>
+                    </StackPanel>
 
                     <!-- 今日时段分布 -->
                     <Grid Grid.Row="2" Margin="0,16,0,0">

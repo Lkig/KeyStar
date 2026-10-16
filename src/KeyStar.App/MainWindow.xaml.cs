@@ -44,7 +44,8 @@ public partial class MainWindow : Window
     private bool _windowPlacementDirty;
     private DateTimeOffset _windowPlacementChangedUtc;
     private bool _settingsLoaded;
-    private string _activeRangePreset = "Today";
+    private string _activeRangePreset = "All";
+    private (long StartUtc, long EndUtc)? _lastCustomRange;
     private (long StartUtc, long EndUtc)? _selectedRange;
     private ulong[] _selectedCounts = new ulong[KeyCatalog.Count];
     private ulong[] _selectedStoredCounts = new ulong[KeyCatalog.Count];
@@ -77,9 +78,9 @@ public partial class MainWindow : Window
         _rowsView.Filter = FilterRow;
         KeyGrid.ItemsSource = _rowsView;
 
-        PopulateTimeChoices();
+        InitializeRangeEditors();
         _rangeControlsReady = true;
-        SetRangeEditorsEnabled(isCustom: false);
+        SetCustomRangeEnabled(isCustom: false);
         _heatmaps = [HeatmapKeyboard, HeatmapGamepad];
         foreach (var heatmap in _heatmaps)
         {
@@ -349,17 +350,23 @@ public partial class MainWindow : Window
         PersistWindowPlacementIfIdle();
     }
 
-    private async void RangePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    private async void RangePresetRadio_Checked(object sender, RoutedEventArgs eventArgs)
     {
-        if (!_rangeControlsReady || RangePresetComboBox.SelectedItem is not ComboBoxItem item)
+        if (!_rangeControlsReady || sender is not RadioButton { Tag: string preset })
         {
             return;
         }
 
-        _activeRangePreset = item.Tag as string ?? "Today";
-        var isCustom = _activeRangePreset == "Custom";
-        SetRangeEditorsEnabled(isCustom);
+        _activeRangePreset = preset;
+        var isCustom = preset == "Custom";
+        SetCustomRangeEnabled(isCustom);
         RangeValidationText.Text = string.Empty;
+        if (isCustom)
+        {
+            // 优先恢复上一次确认过的自定义区间，其次使用最近 30 天作为起点。
+            SetRangeEditorValues(_lastCustomRange ?? GetDefaultCustomRange());
+        }
+
         if (!isCustom)
         {
             await ApplyActivePresetAsync();
@@ -375,19 +382,14 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("请选择开始和结束日期。");
             }
 
-            if (!TimeSpan.TryParseExact(StartTimeComboBox.Text, @"hh\:mm", CultureInfo.InvariantCulture, out var startTime) ||
-                !TimeSpan.TryParseExact(EndTimeComboBox.Text, @"hh\:mm", CultureInfo.InvariantCulture, out var endTime))
+            if (!TimeSpan.TryParseExact(StartTimeTextBox.Text.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var startTime) ||
+                !TimeSpan.TryParseExact(EndTimeTextBox.Text.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var endTime))
             {
                 throw new InvalidOperationException("时间格式应为 HH:mm，例如 09:30。");
             }
 
             var startLocal = DateTime.SpecifyKind(startDate.Date + startTime, DateTimeKind.Unspecified);
             var endLocal = DateTime.SpecifyKind(endDate.Date + endTime, DateTimeKind.Unspecified);
-            if (TenMinuteSnapCheckBox.IsChecked == true)
-            {
-                startLocal = AlignLocalDown(startLocal, 10);
-                endLocal = AlignLocalUp(endLocal, 10);
-            }
 
             var startUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(startLocal, TimeZoneInfo.Local), TimeSpan.Zero);
             var endUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(endLocal, TimeZoneInfo.Local), TimeSpan.Zero);
@@ -399,6 +401,7 @@ public partial class MainWindow : Window
 
             _activeRangePreset = "Custom";
             _selectedRange = range;
+            _lastCustomRange = range;
             RangeValidationText.Text = string.Empty;
             await RefreshSelectedRangeAsync(force: true);
         }
@@ -408,7 +411,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ScaleModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    private void ScaleModeRadio_Checked(object sender, RoutedEventArgs eventArgs)
     {
         if (_rangeControlsReady)
         {
@@ -416,27 +419,26 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PopulateTimeChoices()
+    private void InitializeRangeEditors()
     {
-        for (var minute = 0; minute < 24 * 60; minute += 10)
-        {
-            var text = $"{minute / 60:00}:{minute % 60:00}";
-            StartTimeComboBox.Items.Add(text);
-            EndTimeComboBox.Items.Add(text);
-        }
-
-        StartTimeComboBox.Text = "00:00";
-        EndTimeComboBox.Text = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
+        SetRangeEditorValues(GetDefaultCustomRange());
     }
 
-    private void SetRangeEditorsEnabled(bool isCustom)
+    private static (long StartUtc, long EndUtc) GetDefaultCustomRange()
     {
-        StartDatePicker.IsEnabled = isCustom;
-        StartTimeComboBox.IsEnabled = isCustom;
-        EndDatePicker.IsEnabled = isCustom;
-        EndTimeComboBox.IsEnabled = isCustom;
-        TenMinuteSnapCheckBox.IsEnabled = isCustom;
-        ApplyRangeButton.IsEnabled = isCustom;
+        // 默认展示最近 30 天，用户可在此基础上调整。
+        var end = DateTime.Now;
+        var start = end.Date.AddDays(-30);
+        var startUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(
+            DateTime.SpecifyKind(start, DateTimeKind.Unspecified), TimeZoneInfo.Local), TimeSpan.Zero);
+        var endUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(
+            DateTime.SpecifyKind(end, DateTimeKind.Unspecified), TimeZoneInfo.Local), TimeSpan.Zero);
+        return (TimeBuckets.ToMinuteStart(startUtc), TimeBuckets.ToMinuteStart(endUtc));
+    }
+
+    private void SetCustomRangeEnabled(bool isCustom)
+    {
+        CustomRangePanel.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task ApplyActivePresetAsync()
@@ -453,9 +455,6 @@ public partial class MainWindow : Window
         var endUtc = currentMinute + TimeBuckets.MinuteSeconds;
         return preset switch
         {
-            "Recent10" => (endUtc - TimeBuckets.TenMinuteSeconds, endUtc),
-            "Recent7Days" => (endUtc - (7 * 24 * 60 * TimeBuckets.MinuteSeconds), endUtc),
-            "Recent30Days" => (endUtc - (30 * 24 * 60 * TimeBuckets.MinuteSeconds), endUtc),
             "All" => await ResolveAllRangeAsync(currentMinute, endUtc),
             _ => GetTodayRangeUtc(),
         };
@@ -476,22 +475,13 @@ public partial class MainWindow : Window
         var startLocal = DateTimeOffset.FromUnixTimeSeconds(range.StartUtc).ToLocalTime();
         var endLocal = DateTimeOffset.FromUnixTimeSeconds(range.EndUtc).ToLocalTime();
         StartDatePicker.SelectedDate = startLocal.Date;
-        StartTimeComboBox.Text = startLocal.ToString("HH:mm", CultureInfo.InvariantCulture);
+        StartTimeTextBox.Text = startLocal.ToString("HH:mm", CultureInfo.InvariantCulture);
         EndDatePicker.SelectedDate = endLocal.Date;
-        EndTimeComboBox.Text = endLocal.ToString("HH:mm", CultureInfo.InvariantCulture);
-    }
-
-    private static DateTime AlignLocalDown(DateTime value, int minutes) =>
-        new(value.Year, value.Month, value.Day, value.Hour, value.Minute - (value.Minute % minutes), 0, DateTimeKind.Unspecified);
-
-    private static DateTime AlignLocalUp(DateTime value, int minutes)
-    {
-        var aligned = AlignLocalDown(value, minutes);
-        return aligned == value ? aligned : aligned.AddMinutes(minutes);
+        EndTimeTextBox.Text = endLocal.ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 
     private HeatScaleMode GetScaleMode() =>
-        ScaleModeComboBox.SelectedItem is ComboBoxItem { Tag: "Linear" }
+        ScaleModeLinearRadio.IsChecked == true
             ? HeatScaleMode.Linear
             : HeatScaleMode.SquareRoot;
 
